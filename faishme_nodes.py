@@ -22,7 +22,7 @@ def load_image(img_path):
     return image
 
 
-class ChooseFashionModel:
+class LoadFashionModel:
     def __init__(self):
         self.base_model_dir = os.path.join(comfy_paths.base_path, "faishme", "models")
         self.base_mask_dir = os.path.join(comfy_paths.base_path, "faishme", "masks")
@@ -57,5 +57,9 @@ class ChooseFashionModel:
 
         return (model_img, mask)
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        return np.random.random()
 
-NODE_CLASS_MAPPINGS = {"Choose Fashion Model": ChooseFashionModel}
+
+NODE_CLASS_MAPPINGS = {"Load Fashion Model": LoadFashionModel}
