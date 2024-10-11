@@ -1,4 +1,5 @@
 import os
+from glob import glob
 import numpy as np
 import torch
 import folder_paths as comfy_paths
@@ -45,8 +46,8 @@ class ChooseFashionModel:
         model_dir = os.path.join(self.base_model_dir, gender, ethnicity)
         mask_dir = os.path.join(self.base_mask_dir, gender, ethnicity)
 
-        model_images = sorted(os.listdir(model_dir))
-        mask_images = sorted(os.listdir(mask_dir))
+        model_images = sorted(glob(os.path.join(model_dir, "*")))
+        mask_images = sorted(glob(os.path.join(mask_dir, "*")))
         idx = np.random.randint(len(model_images))
 
         model_img = load_image(model_images[idx])
@@ -57,6 +58,4 @@ class ChooseFashionModel:
         return (model_img, mask)
 
 
-NODE_CLASS_MAPPINGS = {
-    "Choose Fashion Model": ChooseFashionModel
-}
+NODE_CLASS_MAPPINGS = {"Choose Fashion Model": ChooseFashionModel}
