@@ -92,8 +92,8 @@ class FaishmeDebug:
     OUTPUT_NODE = True
 
     def debug(self, value, commands):
-        output = None
-        eval(commands)
+        output = value
+        exec(commands)
         return (output,)
 
 
