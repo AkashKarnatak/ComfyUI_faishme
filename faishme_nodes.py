@@ -85,14 +85,16 @@ class FaishmeDebug:
             }
         }
 
-    RETURN_TYPES = ()
+    RETURN_TYPES = (any,)
+    RETURN_NAMES = ("output",)
     FUNCTION = "debug"
     CATEGORY = "FaishmeNodes"
     OUTPUT_NODE = True
 
     def debug(self, value, commands):
+        output = None
         eval(commands)
-        return (None,)
+        return (output,)
 
 
 NODE_CLASS_MAPPINGS = {
