@@ -62,4 +62,30 @@ class LoadFashionModel:
         return np.random.random()
 
 
-NODE_CLASS_MAPPINGS = {"Load Fashion Model": LoadFashionModel}
+class FaishmeDebug:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+
+        return {
+            "required": {
+                "input": (("*", {})),
+                "commands": ("STRING", {"multiline": True, "default": ""}),
+            }
+        }
+
+    RETURN_TYPES = ()
+    FUNCTION = "debug"
+    CATEGORY = "FaishmeNodes"
+
+    def debug(self, input, commands):
+        eval(commands)
+        return ()
+
+
+NODE_CLASS_MAPPINGS = {
+    "Load Fashion Model": LoadFashionModel,
+    "Fashion Debug": FaishmeDebug,
+}
