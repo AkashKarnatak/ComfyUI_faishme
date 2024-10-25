@@ -22,6 +22,15 @@ def load_image(img_path):
     return image
 
 
+# from https://github.com/pythongosssss/ComfyUI-Custom-Scripts
+class AnyType(str):
+    def __ne__(self, __value: object) -> bool:
+        return False
+
+
+any = AnyType("*")
+
+
 class LoadFashionModel:
     def __init__(self):
         self.base_model_dir = os.path.join(comfy_paths.base_path, "faishme", "models")
@@ -71,7 +80,7 @@ class FaishmeDebug:
 
         return {
             "required": {
-                "input": (("*", {})),
+                "value": (any, {}),
                 "commands": ("STRING", {"multiline": True, "default": ""}),
             }
         }
