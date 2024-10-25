@@ -92,9 +92,9 @@ class FaishmeDebug:
     OUTPUT_NODE = True
 
     def debug(self, value, commands):
-        output = value
+        output = {"value": value}
         exec(commands)
-        return (output,)
+        return (output["value"],)
 
 
 NODE_CLASS_MAPPINGS = {
