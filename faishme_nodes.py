@@ -79,6 +79,7 @@ class FaishmeDebug:
     RETURN_TYPES = ()
     FUNCTION = "debug"
     CATEGORY = "FaishmeNodes"
+    OUTPUT_NODE = True
 
     def debug(self, input, commands):
         eval(commands)
@@ -87,5 +88,5 @@ class FaishmeDebug:
 
 NODE_CLASS_MAPPINGS = {
     "Load Fashion Model": LoadFashionModel,
-    "Fashion Debug": FaishmeDebug,
+    "Faishme Debug": FaishmeDebug,
 }
