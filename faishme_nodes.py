@@ -82,7 +82,7 @@ class FaishmeDebug:
 
     def debug(self, input, commands):
         eval(commands)
-        return ()
+        return (None,)
 
 
 NODE_CLASS_MAPPINGS = {
