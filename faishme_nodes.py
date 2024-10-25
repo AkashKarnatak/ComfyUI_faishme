@@ -90,7 +90,7 @@ class FaishmeDebug:
     CATEGORY = "FaishmeNodes"
     OUTPUT_NODE = True
 
-    def debug(self, input, commands):
+    def debug(self, value, commands):
         eval(commands)
         return (None,)
 
