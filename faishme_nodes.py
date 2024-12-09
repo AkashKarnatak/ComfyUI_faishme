@@ -13,7 +13,7 @@ import folder_paths
 # Tensor to PIL
 def tensor2pil(image):
     return Image.fromarray(
-        np.clip(255.0 * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8)
+        np.clip(255.0 * image.cpu().numpy()[0], 0, 255).astype(np.uint8)
     )
 
 
@@ -115,8 +115,8 @@ class MannequinToModelLoader:
             }
         }
 
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("model_name", "pose_prompt")
+    RETURN_TYPES = ("STRING", "STRING", "STRING")
+    RETURN_NAMES = ("model_name", "pose_prompt", "pose_hint")
     FUNCTION = "get_model_params"
     CATEGORY = "FaishmeNodes"
 
@@ -129,7 +129,7 @@ class MannequinToModelLoader:
             "closeup": f"closeup portrait of {model_name}",
             "none": f"{model_name}",
         }
-        return (model_name, pose_prompt_dict[pose_hint])
+        return (model_name, pose_prompt_dict[pose_hint], pose_hint)
 
 
 class FaishmeDebug:
