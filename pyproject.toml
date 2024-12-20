@@ -1,0 +1,15 @@
+[project]
+name = "comfyui_faishme"
+description = "ComfyUI nodes for our product Faishme"
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["numpy", "torch", "pillow"]
+
+[project.urls]
+Repository = "https://github.com/AkashKarnatak/ComfyUI_faishme"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI_faishme"
+Icon = ""
