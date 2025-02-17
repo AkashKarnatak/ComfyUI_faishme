@@ -55,7 +55,7 @@ class AnyType(str):
         return False
 
 
-any = AnyType("*")
+Any = AnyType("*")
 
 
 class LoadFashionModel:
@@ -141,12 +141,12 @@ class FaishmeDebug:
 
         return {
             "required": {
-                "value": (any, {}),
+                "value": (Any, {}),
                 "commands": ("STRING", {"multiline": True, "default": ""}),
             }
         }
 
-    RETURN_TYPES = (any,)
+    RETURN_TYPES = (Any,)
     RETURN_NAMES = ("output",)
     FUNCTION = "debug"
     CATEGORY = "FaishmeNodes"
@@ -229,10 +229,79 @@ class MoondreamNode:
 
         return (result,)
 
+class LoadImagesFromGlobList:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "pattern": ("STRING", {"default": ""}),
+            },
+            "optional": {
+                "image_load_cap": ("INT", {"default": 0, "min": 0, "step": 1}),
+                "start_index": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff, "step": 1}),
+                "load_always": ("BOOLEAN", {"default": False, "label_on": "enabled", "label_off": "disabled"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("IMAGE", "FILE PATH")
+    OUTPUT_IS_LIST = (True, True)
+
+    FUNCTION = "load_images"
+
+    CATEGORY = "FaishmeNodes"
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        if 'load_always' in kwargs and kwargs['load_always']:
+            return float("NaN")
+        else:
+            return hash(frozenset(kwargs))
+
+    def load_images(self, pattern: str, image_load_cap: int = 0, start_index: int = 0, load_always=False):
+        dir_files = glob(pattern)
+        if len(dir_files) == 0:
+            raise FileNotFoundError(f"No files in directory '{pattern}'.")
+
+        # Filter files by extension
+        valid_extensions = ['.jpg', '.jpeg', '.png', '.webp']
+        dir_files = [f for f in dir_files if any(f.lower().endswith(ext) for ext in valid_extensions)]
+
+        dir_files = sorted(dir_files)
+
+        # start at start_index
+        dir_files = dir_files[start_index:]
+
+        images = []
+        file_paths = []
+
+        limit_images = False
+        if image_load_cap > 0:
+            limit_images = True
+        image_count = 0
+
+        for image_path in dir_files:
+            if os.path.isdir(image_path) and os.path.ex:
+                continue
+            if limit_images and image_count >= image_load_cap:
+                break
+            i = Image.open(image_path)
+            i = ImageOps.exif_transpose(i)
+            image = i.convert("RGB")
+            image = np.array(image).astype(np.float32) / 255.0
+            image = torch.from_numpy(image)[None,]
+
+            images.append(image)
+            file_paths.append(str(image_path))
+            image_count += 1
+
+        return (images, file_paths)
+
 
 NODE_CLASS_MAPPINGS = {
     "Load Fashion Model": LoadFashionModel,
     "Faishme Debug": FaishmeDebug,
     "Faishme Moondream": MoondreamNode,
     "Faishme Mannequin to Model Loader": MannequinToModelLoader,
+    "Faishme Load Image from Glob": LoadImagesFromGlobList,
 }
