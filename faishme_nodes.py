@@ -165,7 +165,6 @@ class MoondreamNode:
 
         # get_torch_device()
         self.moondream = None
-        self.tokenizer = None
 
     @classmethod
     def INPUT_TYPES(s):
@@ -176,7 +175,7 @@ class MoondreamNode:
                     "STRING",
                     {"multiline": True, "default": "", "dynamicPrompts": False},
                 ),
-                "device": (["cpu", "cuda"],),
+                "device": (["cuda", "cpu"],),
             },
         }
 
@@ -204,12 +203,12 @@ class MoondreamNode:
             self.moondream = None
 
         if self.moondream == None:
-            revision = "2024-08-26"
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                "vikhyatk/moondream2", revision=revision
-            )
             self.moondream = AutoModelForCausalLM.from_pretrained(
-                "vikhyatk/moondream2", trust_remote_code=True, revision=revision
+                "vikhyatk/moondream2",
+                revision="2025-01-09",
+                trust_remote_code=True,
+                # Uncomment for GPU acceleration & pip install accelerate
+                device_map={"": "cpu"},
             )
             self.moondream.eval()
 
@@ -219,15 +218,12 @@ class MoondreamNode:
             im = image[i]
             im = tensor2pil(im)
 
-            image_embeds = self.moondream.encode_image(im)
-
-            # streamer = TextIteratorStreamer(self.tokenizer, skip_special_tokens=True)
-
-            res = self.moondream.answer_question(image_embeds, question, self.tokenizer)
+            res = self.moondream.query(im, question)["answer"]
 
             result.append(res)
 
         return (result,)
+
 
 class LoadImagesFromGlobList:
     @classmethod
@@ -238,9 +234,15 @@ class LoadImagesFromGlobList:
             },
             "optional": {
                 "image_load_cap": ("INT", {"default": 0, "min": 0, "step": 1}),
-                "start_index": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff, "step": 1}),
-                "load_always": ("BOOLEAN", {"default": False, "label_on": "enabled", "label_off": "disabled"}),
-            }
+                "start_index": (
+                    "INT",
+                    {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "step": 1},
+                ),
+                "load_always": (
+                    "BOOLEAN",
+                    {"default": False, "label_on": "enabled", "label_off": "disabled"},
+                ),
+            },
         }
 
     RETURN_TYPES = ("IMAGE", "STRING")
@@ -253,19 +255,29 @@ class LoadImagesFromGlobList:
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
-        if 'load_always' in kwargs and kwargs['load_always']:
+        if "load_always" in kwargs and kwargs["load_always"]:
             return float("NaN")
         else:
             return hash(frozenset(kwargs))
 
-    def load_images(self, pattern: str, image_load_cap: int = 0, start_index: int = 0, load_always=False):
+    def load_images(
+        self,
+        pattern: str,
+        image_load_cap: int = 0,
+        start_index: int = 0,
+        load_always=False,
+    ):
         dir_files = glob(pattern)
         if len(dir_files) == 0:
             raise FileNotFoundError(f"No files in directory '{pattern}'.")
 
         # Filter files by extension
-        valid_extensions = ['.jpg', '.jpeg', '.png', '.webp']
-        dir_files = [f for f in dir_files if any(f.lower().endswith(ext) for ext in valid_extensions)]
+        valid_extensions = [".jpg", ".jpeg", ".png", ".webp"]
+        dir_files = [
+            f
+            for f in dir_files
+            if any(f.lower().endswith(ext) for ext in valid_extensions)
+        ]
 
         dir_files = sorted(dir_files)
 
