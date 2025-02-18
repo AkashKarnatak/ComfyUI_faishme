@@ -1,11 +1,13 @@
 import os
+import math
 from glob import glob
 import numpy as np
 import torch
 import folder_paths as comfy_paths
 import node_helpers
 from PIL import Image, ImageOps
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM
+from concurrent.futures import ThreadPoolExecutor
 
 import folder_paths
 
@@ -20,6 +22,17 @@ def tensor2pil(image):
 # Convert PIL to Tensor
 def pil2tensor(image):
     return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
+
+
+def load_image_check(image_path):
+    if os.path.isdir(image_path) and os.path.ex:
+        return
+    i = Image.open(image_path)
+    i = ImageOps.exif_transpose(i)
+    image = i.convert("RGB")
+    image = np.array(image).astype(np.float32) / 255.0
+    image = torch.from_numpy(image)[None,]
+    return (image, image_path)
 
 
 def load_image(img_path):
@@ -163,6 +176,10 @@ class MoondreamNode:
         self.device = torch.device("cuda")
         self.dtype = torch.float32
 
+        # self.moondream_path = "vikhyatk/moondream2"
+        # self.moondream_path = os.path.join(comfy_paths.models_dir, "moondream")
+        # assert os.path.isdir(self.moondream_path)
+
         # get_torch_device()
         self.moondream = None
 
@@ -208,7 +225,7 @@ class MoondreamNode:
                 revision="2025-01-09",
                 trust_remote_code=True,
                 # Uncomment for GPU acceleration & pip install accelerate
-                device_map={"": "cpu"},
+                device_map={"": "cuda"},
             )
             self.moondream.eval()
 
@@ -287,27 +304,229 @@ class LoadImagesFromGlobList:
         images = []
         file_paths = []
 
-        limit_images = False
-        if image_load_cap > 0:
-            limit_images = True
-        image_count = 0
-
-        for image_path in dir_files:
-            if os.path.isdir(image_path) and os.path.ex:
-                continue
-            if limit_images and image_count >= image_load_cap:
-                break
-            i = Image.open(image_path)
-            i = ImageOps.exif_transpose(i)
-            image = i.convert("RGB")
-            image = np.array(image).astype(np.float32) / 255.0
-            image = torch.from_numpy(image)[None,]
-
-            images.append(image)
-            file_paths.append(str(image_path))
-            image_count += 1
+        with ThreadPoolExecutor() as executor:
+            images, file_paths = list(zip(*executor.map(load_image_check, dir_files)))
 
         return (images, file_paths)
+
+
+class StackImages:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "stack_size": (
+                    "INT",
+                    {"default": 1, "min": 1, "max": 16, "step": 1},
+                ),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE", "INT")
+    RETURN_NAMES = ("image", "stack_size")
+
+    FUNCTION = "stack_image"
+    CATEGORY = "FaishmeNodes"
+    OUTPUT_NODE = True
+
+    INPUT_IS_LIST = True
+    OUTPUT_IS_LIST = (True, True)
+
+    def stack_image(self, image, stack_size):
+        return (
+            [
+                torch.cat(image[i : i + stack_size[0]], dim=0)
+                for i in range(0, len(image), stack_size[0])
+            ],
+            stack_size,
+        )
+
+
+class UnstackImages:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "stack_size": (
+                    "INT",
+                    {"default": 1, "min": 1, "max": 16, "step": 1},
+                ),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+
+    FUNCTION = "unstack_image"
+    CATEGORY = "FaishmeNodes"
+    OUTPUT_NODE = True
+
+    INPUT_IS_LIST = True
+    OUTPUT_IS_LIST = (True,)
+
+    def unstack_image(self, image, stack_size):
+        result = []
+        for img in image:
+            result.extend(img.split(stack_size[0], dim=0))
+        return (result,)
+
+
+class StackLatents:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "latent": ("LATENT",),
+                "stack_size": (
+                    "INT",
+                    {"default": 1, "min": 1, "max": 16, "step": 1},
+                ),
+            },
+        }
+
+    RETURN_TYPES = ("LATENT", "INT")
+    RETURN_NAMES = ("latent", "stack_size")
+
+    FUNCTION = "stack_latent"
+    CATEGORY = "FaishmeNodes"
+    OUTPUT_NODE = True
+
+    INPUT_IS_LIST = True
+    OUTPUT_IS_LIST = (True, True)
+
+    def stack_latent(self, latent, stack_size):
+        return (
+            [
+                {
+                    key: torch.cat(
+                        [x[key] for x in latent[i : i + stack_size[0]]], dim=0
+                    )
+                    for key, _ in latent[i].items()
+                }
+                for i in range(0, len(latent), stack_size[0])
+            ],
+            stack_size,
+        )
+
+
+class UnstackLatents:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "latent": ("LATENT",),
+                "stack_size": (
+                    "INT",
+                    {"default": 1, "min": 1, "max": 16, "step": 1},
+                ),
+            },
+        }
+
+    RETURN_TYPES = ("LATENT",)
+    RETURN_NAMES = ("latent",)
+
+    FUNCTION = "unstack_latent"
+    CATEGORY = "FaishmeNodes"
+    OUTPUT_NODE = True
+
+    INPUT_IS_LIST = True
+    OUTPUT_IS_LIST = (True,)
+
+    def unstack_latent(self, latent, stack_size):
+        result = []
+        for lat in latent:
+            result.extend(latent.split(stack_size[0], dim=0))
+        return (result,)
+
+
+class RepeatImageRowsBatch:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "amount": ("INT", {"default": 1, "min": 1, "max": 4096}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "repeat"
+
+    CATEGORY = "FaishmeNodes"
+
+    def repeat(self, image, amount):
+        if len(image.shape) == 3:
+            image = image.unsqueeze(0)
+        b, h, w, c = image.shape
+        s = (
+            image.reshape(b, 1, h, w, c)
+            .repeat((1, amount, 1, 1, 1))
+            .reshape(-1, h, w, c)
+        )
+        return (s,)
+
+
+class RepeatLatentRowsBatch:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "samples": ("LATENT",),
+                "amount": ("INT", {"default": 1, "min": 1, "max": 64}),
+            }
+        }
+
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "repeat"
+
+    CATEGORY = "FaishmeDebug"
+
+    def repeat(self, samples, amount):
+        s = samples.copy()
+        s_in = samples["samples"]
+
+        if len(s_in.shape) == 3:
+            s_in = s_in.unsqueeze(0)
+        b, c, h, w = s_in.shape
+        s["samples"] = (
+            s_in.reshape(b, 1, c, h, w)
+            .repeat((1, amount, 1, 1, 1))
+            .reshape(-1, c, h, w)
+        )
+        if "noise_mask" in samples and samples["noise_mask"].shape[0] > 1:
+            masks = samples["noise_mask"]
+            if masks.shape[0] < s_in.shape[0]:
+                masks = masks.repeat(
+                    math.ceil(s_in.shape[0] / masks.shape[0]), 1, 1, 1
+                )[: s_in.shape[0]]
+            if len(masks.shape) == 3:
+                masks = masks.unsqueeze(0)
+            b, c, h, w = masks.shape
+            s["noise_mask"] = (
+                masks.reshape(b, 1, c, h, w)
+                .repeat((1, amount, 1, 1, 1))
+                .reshape(-1, c, h, w)
+            )
+        if "batch_index" in s:
+            offset = max(s["batch_index"]) - min(s["batch_index"]) + 1
+            s["batch_index"] = s["batch_index"] + [
+                x + (i * offset) for i in range(1, amount) for x in s["batch_index"]
+            ]
+        return (s,)
 
 
 NODE_CLASS_MAPPINGS = {
@@ -316,4 +535,10 @@ NODE_CLASS_MAPPINGS = {
     "Faishme Moondream": MoondreamNode,
     "Faishme Mannequin to Model Loader": MannequinToModelLoader,
     "Faishme Load Image from Glob": LoadImagesFromGlobList,
+    "Faishme Stack Images": StackImages,
+    "Faishme Unstack Images": UnstackImages,
+    "Faishme Stack Latents": StackLatents,
+    "Faishme Unstack Latents": UnstackLatents,
+    "Faishme Repeat Image Batch": RepeatImageRowsBatch,
+    "Faishme Repeat Latent Batch": RepeatLatentRowsBatch,
 }
