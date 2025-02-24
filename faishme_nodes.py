@@ -548,6 +548,8 @@ class MemoryDebug:
     FUNCTION = "debug_memory"
     CATEGORY = "FaishmeNodes"
     OUTPUT_NODE = True
+    INPUT_IS_LIST = True
+    OUTPUT_IS_LIST = (True, False,)
 
     def debug_memory(self, value):
         global MEMORY_DEBUG_IDX
