@@ -1,6 +1,7 @@
 import os
 import gc
 import math
+import psutil
 from glob import glob
 import numpy as np
 import torch
@@ -528,6 +529,31 @@ class RepeatLatentRowsBatch:
             ]
         return (s,)
 
+class MemoryDebug:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+
+        return {
+            "required": {
+                "value": (Any, {}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("debug_info",)
+    FUNCTION = "debug_memory"
+    CATEGORY = "FaishmeNodes"
+    OUTPUT_NODE = True
+
+    def debug_memory(self, value):
+        vram_used = torch.cuda.memory_allocated()
+        ram_used = psutil.virtual_memory().used
+        debug_info = f"GPU VRAM: {vram_used/1e9:.2f} GB,\nSystem RAM: {ram_used/1e9:.2f} GB"
+        return (debug_info,)
+
 
 NODE_CLASS_MAPPINGS = {
     "Load Fashion Model": LoadFashionModel,
@@ -541,4 +567,5 @@ NODE_CLASS_MAPPINGS = {
     "Faishme Unstack Latents": UnstackLatents,
     "Faishme Repeat Image Batch": RepeatImageRowsBatch,
     "Faishme Repeat Latent Batch": RepeatLatentRowsBatch,
+    "Faishme Memory Debug": MemoryDebug,
 }
