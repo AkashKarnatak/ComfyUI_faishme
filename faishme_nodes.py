@@ -557,9 +557,9 @@ class MemoryDebug:
         debug_info = f"Index: {MEMORY_DEBUG_IDX}\n"
         ram_used = psutil.virtual_memory().used
         gpu_stats = gpustat.GPUStatCollection.new_query()
-        debug_info += f"System RAM used: {ram_used/1e9:.2f}\n"
+        debug_info += f"System RAM used: {ram_used/1e9:.2f} GB\n"
         for idx, gpu in enumerate(gpu_stats):
-            debug_info += f"GPU {idx} VRAM used: {gpu.memory_used/1024:.2f}\n"
+            debug_info += f"GPU {idx} VRAM used: {gpu.memory_used/1024:.2f} GB\n"
         MEMORY_DEBUG_IDX += 1
         return (value, debug_info)
 
