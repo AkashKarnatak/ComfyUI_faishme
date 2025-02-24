@@ -541,8 +541,8 @@ class MemoryDebug:
             }
         }
 
-    RETURN_TYPES = (Any, "STRING",)
-    RETURN_NAMES = ("value", "debug_info",)
+    RETURN_TYPES = (Any, "STRING")
+    RETURN_NAMES = ("value", "debug_info")
     FUNCTION = "debug_memory"
     CATEGORY = "FaishmeNodes"
     OUTPUT_NODE = True
@@ -551,7 +551,7 @@ class MemoryDebug:
         vram_used = torch.cuda.memory_allocated()
         ram_used = psutil.virtual_memory().used
         debug_info = f"GPU VRAM: {vram_used/1e9:.2f} GB,\nSystem RAM: {ram_used/1e9:.2f} GB"
-        return (value, debug_info,)
+        return (value, debug_info)
 
 
 NODE_CLASS_MAPPINGS = {
