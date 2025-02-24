@@ -1,4 +1,5 @@
 import os
+import gc
 import math
 from glob import glob
 import numpy as np
@@ -24,15 +25,19 @@ def pil2tensor(image):
     return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
 
 
-def load_image_check(image_path):
+def load_image_check(image_path, width, height):
     if os.path.isdir(image_path) and os.path.ex:
         return
     i = Image.open(image_path)
     i = ImageOps.exif_transpose(i)
-    image = i.convert("RGB")
-    image = np.array(image).astype(np.float32) / 255.0
-    image = torch.from_numpy(image)[None,]
-    return (image, image_path)
+    image = i.resize((width, height), Image.LANCZOS)
+    del i
+    image = image.convert("RGB")
+    image_np = np.array(image).astype(np.float32) / 255.0
+    del image
+    image_tensor = torch.from_numpy(image_np)[None,]
+    del image_np  # Remove NumPy array
+    return (image_tensor, image_path)
 
 
 def load_image(img_path):
@@ -124,7 +129,7 @@ class MannequinToModelLoader:
                     folder_paths.get_filename_list("loras"),
                     {"tooltip": "The name of the LoRA."},
                 ),
-                "pose_hint": (["front", "side", "back", "closeup"],),
+                "pose_hint": (["full-front", "full-side", "full-back", "upper-front", "upper-side", "upper-back", "closeup"],),
             }
         }
 
@@ -136,9 +141,12 @@ class MannequinToModelLoader:
     def get_model_params(self, lora_name, pose_hint):
         model_name = lora_name.split(".")[0]
         pose_prompt_dict = {
-            "front": f"full body portrait of {model_name} in front view",
-            "side": f"full body portrait of {model_name} in side view",
-            "back": f"full body portrait of {model_name} in back view",
+            "full-front": f"full body portrait of {model_name} in front view",
+            "upper-front": f"upper body portrait of {model_name} in front view",
+            "full-side": f"full body portrait of {model_name} in side view",
+            "upper-side": f"upper body portrait of {model_name} in side view",
+            "full-back": f"full body portrait of {model_name} in back view",
+            "upper-back": f"upper body portrait of {model_name} in back view",
             "closeup": f"closeup portrait of {model_name}",
             "none": f"{model_name}",
         }
@@ -251,14 +259,8 @@ class LoadImagesFromGlobList:
             },
             "optional": {
                 "image_load_cap": ("INT", {"default": 0, "min": 0, "step": 1}),
-                "start_index": (
-                    "INT",
-                    {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "step": 1},
-                ),
-                "load_always": (
-                    "BOOLEAN",
-                    {"default": False, "label_on": "enabled", "label_off": "disabled"},
-                ),
+                "width": ("INT", { "default": 1024, "min": 0, "max": 8192, "step": 1, }),
+                "height": ("INT", { "default": 1536, "min": 0, "max": 8192, "step": 1, }),
             },
         }
 
@@ -280,9 +282,8 @@ class LoadImagesFromGlobList:
     def load_images(
         self,
         pattern: str,
-        image_load_cap: int = 0,
-        start_index: int = 0,
-        load_always=False,
+        width: int,
+        height: int,
     ):
         dir_files = glob(pattern)
         if len(dir_files) == 0:
@@ -298,14 +299,13 @@ class LoadImagesFromGlobList:
 
         dir_files = sorted(dir_files)
 
-        # start at start_index
-        dir_files = dir_files[start_index:]
-
         images = []
         file_paths = []
 
         with ThreadPoolExecutor() as executor:
-            images, file_paths = list(zip(*executor.map(load_image_check, dir_files)))
+            images, file_paths = list(zip(*executor.map(load_image_check, dir_files, [width] * len(dir_files), [height] * len(dir_files))))
+
+        gc.collect()
 
         return (images, file_paths)
 
