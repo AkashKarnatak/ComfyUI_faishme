@@ -259,15 +259,14 @@ class LoadImagesFromGlobList:
                 "pattern": ("STRING", {"default": ""}),
             },
             "optional": {
-                "image_load_cap": ("INT", {"default": 0, "min": 0, "step": 1}),
                 "width": ("INT", { "default": 1024, "min": 0, "max": 8192, "step": 1, }),
                 "height": ("INT", { "default": 1536, "min": 0, "max": 8192, "step": 1, }),
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "STRING")
-    RETURN_NAMES = ("IMAGE", "FILE PATH")
-    OUTPUT_IS_LIST = (True, True)
+    RETURN_TYPES = ("IMAGE", "STRING", "INT", "INT")
+    RETURN_NAMES = ("IMAGE", "FILE PATH", "width", "height")
+    OUTPUT_IS_LIST = (True, True, False, False)
 
     FUNCTION = "load_images"
 
@@ -308,7 +307,7 @@ class LoadImagesFromGlobList:
 
         gc.collect()
 
-        return (images, file_paths)
+        return (images, file_paths, width, height)
 
 
 class StackImages:
