@@ -258,8 +258,7 @@ class LoadImagesFromGlobList:
         return {
             "required": {
                 "pattern": ("STRING", {"default": ""}),
-            },
-            "optional": {
+                "file_path": ("STRING", {"default": ""}),
                 "width": ("INT", { "default": 1024, "min": 0, "max": 8192, "step": 1, }),
                 "height": ("INT", { "default": 1536, "min": 0, "max": 8192, "step": 1, }),
             },
@@ -267,6 +266,7 @@ class LoadImagesFromGlobList:
 
     RETURN_TYPES = ("IMAGE", "STRING", "INT", "INT")
     RETURN_NAMES = ("IMAGE", "FILE PATH", "width", "height")
+    INPUT_IS_LIST = True
     OUTPUT_IS_LIST = (True, True, False, False)
 
     FUNCTION = "load_images"
@@ -283,22 +283,27 @@ class LoadImagesFromGlobList:
     def load_images(
         self,
         pattern: str,
+        file_path,
         width: int,
         height: int,
     ):
-        dir_files = glob(pattern)
-        if len(dir_files) == 0:
-            raise FileNotFoundError(f"No files in directory '{pattern}'.")
+        pattern, width, height = pattern[0], width[0], height[0]
+        if file_path[0] != "":
+            dir_files = file_path
+        else:
+            dir_files = glob(pattern)
+            if len(dir_files) == 0:
+                raise FileNotFoundError(f"No files in directory '{pattern}'.")
 
-        # Filter files by extension
-        valid_extensions = [".jpg", ".jpeg", ".png", ".webp"]
-        dir_files = [
-            f
-            for f in dir_files
-            if any(f.lower().endswith(ext) for ext in valid_extensions)
-        ]
+            # Filter files by extension
+            valid_extensions = [".jpg", ".jpeg", ".png", ".webp"]
+            dir_files = [
+                f
+                for f in dir_files
+                if any(f.lower().endswith(ext) for ext in valid_extensions)
+            ]
 
-        dir_files = sorted(dir_files)
+            dir_files = sorted(dir_files)
 
         images = []
         file_paths = []
