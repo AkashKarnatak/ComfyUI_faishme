@@ -653,6 +653,53 @@ class FaishmeSaveImage:
         return ()
 
 
+class RepeatTensorBatch:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+
+        return {
+            "required": {
+                "tensor": (Any, {}),
+                "repeat": ("INT", {"default": 1, "min": 1, "max": 128}),
+            }
+        }
+
+    RETURN_TYPES = (Any,)
+    RETURN_NAMES = ("tensor",)
+    FUNCTION = "repeat"
+    CATEGORY = "FaishmeNodes"
+
+    def repeat(self, tensor, repeat):
+        assert isinstance(tensor, torch.Tensor)
+        return (tensor.repeat(repeat, *([1] * (tensor.dim() - 1))),)
+
+
+class RepeatBBOX:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+
+        return {
+            "required": {
+                "bbox": ("BBOX",),
+                "repeat": ("INT", {"default": 1, "min": 1, "max": 128}),
+            }
+        }
+
+    RETURN_TYPES = ("BBOX",)
+    RETURN_NAMES = ("bbox",)
+    FUNCTION = "repeat"
+    CATEGORY = "FaishmeNodes"
+
+    def repeat(self, bbox, repeat):
+        return (bbox * repeat,)
+
+
 NODE_CLASS_MAPPINGS = {
     "Load Fashion Model": LoadFashionModel,
     "Faishme Debug": FaishmeDebug,
@@ -667,4 +714,6 @@ NODE_CLASS_MAPPINGS = {
     "Faishme Repeat Latent Batch": RepeatLatentRowsBatch,
     "Faishme Memory Debug": MemoryDebug,
     "Faishme Save Image": FaishmeSaveImage,
+    "Faishme Repeat Tensor Batch": RepeatTensorBatch,
+    "Faishme Repeat BBOX": RepeatBBOX,
 }
