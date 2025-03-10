@@ -18,7 +18,7 @@ import folder_paths
 # Tensor to PIL
 def tensor2pil(image):
     return Image.fromarray(
-        np.clip(255.0 * image.cpu().numpy()[0], 0, 255).astype(np.uint8)
+        np.clip(255.0 * image.cpu().numpy(), 0, 255).astype(np.uint8)
     )
 
 
@@ -131,7 +131,17 @@ class MannequinToModelLoader:
                     folder_paths.get_filename_list("loras"),
                     {"tooltip": "The name of the LoRA."},
                 ),
-                "pose_hint": (["full-front", "full-side", "full-back", "upper-front", "upper-side", "upper-back", "closeup"],),
+                "pose_hint": (
+                    [
+                        "full-front",
+                        "full-side",
+                        "full-back",
+                        "upper-front",
+                        "upper-side",
+                        "upper-back",
+                        "closeup",
+                    ],
+                ),
             }
         }
 
@@ -183,15 +193,8 @@ class FaishmeDebug:
 
 class MoondreamNode:
     def __init__(self):
-        self.device = torch.device("cuda")
-        self.dtype = torch.float32
-
-        # self.moondream_path = "vikhyatk/moondream2"
-        # self.moondream_path = os.path.join(comfy_paths.models_dir, "moondream")
-        # assert os.path.isdir(self.moondream_path)
-
-        # get_torch_device()
         self.moondream = None
+        self.device = None
 
     @classmethod
     def INPUT_TYPES(s):
@@ -212,44 +215,21 @@ class MoondreamNode:
 
     CATEGORY = "FaishmeNodes"
 
-    INPUT_IS_LIST = True
-    OUTPUT_IS_LIST = (True,)
-
     def run(self, image, question, device):
-
-        result = []
-
-        if device[0] != self.device.type and device[0] == "cpu":
-            self.device = torch.device(device[0])
-            self.dtype = torch.float32
-            self.moondream = None
-        elif device[0] != self.device.type:
-            device, dtype = detect_device()
+        if device != self.device:
             self.device = device
-            self.dtype = dtype
-            self.moondream = None
-
-        if self.moondream == None:
+            del self.moondream
             self.moondream = AutoModelForCausalLM.from_pretrained(
                 "vikhyatk/moondream2",
                 revision="2025-01-09",
                 trust_remote_code=True,
                 # Uncomment for GPU acceleration & pip install accelerate
-                device_map={"": "cuda"},
+                device_map={"": self.device},
             )
             self.moondream.eval()
 
-        question = question[0]
-
-        for i in range(len(image)):
-            im = image[i]
-            im = tensor2pil(im)
-
-            res = self.moondream.query(im, question)["answer"]
-
-            result.append(res)
-
-        return (result,)
+        res = self.moondream.query(tensor2pil(image[0]), question)["answer"]
+        return (res,)
 
 
 class LoadImagesFromGlobList:
@@ -259,8 +239,24 @@ class LoadImagesFromGlobList:
             "required": {
                 "pattern": ("STRING", {"default": ""}),
                 "file_path": ("STRING", {"default": ""}),
-                "width": ("INT", { "default": 1024, "min": 0, "max": 8192, "step": 1, }),
-                "height": ("INT", { "default": 1536, "min": 0, "max": 8192, "step": 1, }),
+                "width": (
+                    "INT",
+                    {
+                        "default": 1024,
+                        "min": 0,
+                        "max": 8192,
+                        "step": 1,
+                    },
+                ),
+                "height": (
+                    "INT",
+                    {
+                        "default": 1536,
+                        "min": 0,
+                        "max": 8192,
+                        "step": 1,
+                    },
+                ),
             },
         }
 
@@ -309,7 +305,16 @@ class LoadImagesFromGlobList:
         file_paths = []
 
         with ThreadPoolExecutor() as executor:
-            images, file_paths = list(zip(*executor.map(load_image_check, dir_files, [width] * len(dir_files), [height] * len(dir_files))))
+            images, file_paths = list(
+                zip(
+                    *executor.map(
+                        load_image_check,
+                        dir_files,
+                        [width] * len(dir_files),
+                        [height] * len(dir_files),
+                    )
+                )
+            )
 
         gc.collect()
 
@@ -534,7 +539,9 @@ class RepeatLatentRowsBatch:
             ]
         return (s,)
 
+
 MEMORY_DEBUG_IDX = 0
+
 
 class MemoryDebug:
     def __init__(self):
@@ -555,7 +562,10 @@ class MemoryDebug:
     CATEGORY = "FaishmeNodes"
     OUTPUT_NODE = True
     INPUT_IS_LIST = True
-    OUTPUT_IS_LIST = (True, False,)
+    OUTPUT_IS_LIST = (
+        True,
+        False,
+    )
 
     def debug_memory(self, value):
         global MEMORY_DEBUG_IDX
@@ -578,7 +588,7 @@ class FaishmeSaveImage:
         return {
             "required": {
                 "images": ("IMAGE", {"tooltip": "The images to save."}),
-                "file_path": (
+                "file_paths": (
                     "STRING",
                     {"forceInput": True, "tooltip": "Save location of file"},
                 ),
@@ -599,8 +609,13 @@ class FaishmeSaveImage:
     DESCRIPTION = "Saves the input images to the provided directory."
 
     def save_images(self, images, file_paths, suffix="gen"):
+        suffix = suffix[0]
+
         def _output_path(file_path, suffix, n_img):
             base, ext = os.path.splitext(file_path)
+
+            # create directory
+            os.makedirs(os.path.dirname(base), exist_ok=True)
 
             if suffix != "":
                 suffix = "_" + suffix
@@ -608,11 +623,10 @@ class FaishmeSaveImage:
             counter_start = None if n_img == 1 else 1
             existing_files = glob(base + suffix + "*")
             if len(existing_files) > 0:
-                counter_str = int(
-                    max(existing_files).split(self.delim)[-1].split(".")[0]
-                )
                 try:
-                    counter_start = int(counter_str)
+                    counter_start = (
+                        int(max(existing_files).split(self.delim)[-1].split(".")[0]) + 1
+                    )
                 except ValueError:
                     counter_start = 1
             if counter_start:
@@ -631,9 +645,10 @@ class FaishmeSaveImage:
             for img, file_path in zip(images, file_paths)
             for path in _output_path(file_path, suffix, len(img))
         ]
-        imgs = [i for img in images for i in img]
+        imgs = [tensor2pil(i) for img in images for i in img]
         with ThreadPoolExecutor() as executor:
-            executor.map(_save_img, imgs, save_paths)
+            # dummy list comprehension to catch thread exceptions in main thread
+            [x for x in executor.map(_save_img, imgs, save_paths)]
 
         return ()
 
