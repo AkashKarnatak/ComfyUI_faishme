@@ -569,6 +569,75 @@ class MemoryDebug:
         return (value, debug_info)
 
 
+class FaishmeSaveImage:
+    def __init__(self):
+        self.delim = "_"
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "images": ("IMAGE", {"tooltip": "The images to save."}),
+                "file_path": (
+                    "STRING",
+                    {"forceInput": True, "tooltip": "Save location of file"},
+                ),
+                "suffix": (
+                    "STRING",
+                    {"default": "gen", "tooltip": "Suffix identifier for the output"},
+                ),
+            },
+        }
+
+    RETURN_TYPES = ()
+    FUNCTION = "save_images"
+
+    OUTPUT_NODE = True
+    INPUT_IS_LIST = True
+
+    CATEGORY = "FaishmeNodes"
+    DESCRIPTION = "Saves the input images to the provided directory."
+
+    def save_images(self, images, file_paths, suffix="gen"):
+        def _output_path(file_path, suffix, n_img):
+            base, ext = os.path.splitext(file_path)
+
+            if suffix != "":
+                suffix = "_" + suffix
+
+            counter_start = None if n_img == 1 else 1
+            existing_files = glob(base + suffix + "*")
+            if len(existing_files) > 0:
+                counter_str = int(
+                    max(existing_files).split(self.delim)[-1].split(".")[0]
+                )
+                try:
+                    counter_start = int(counter_str)
+                except ValueError:
+                    counter_start = 1
+            if counter_start:
+                return [
+                    f"{base}{suffix}_{counter:04}{ext}"
+                    for counter in range(counter_start, counter_start + n_img)
+                ]
+            else:
+                return [base + suffix + ext] * n_img
+
+        def _save_img(img, path):
+            img.save(path)
+
+        save_paths = [
+            path
+            for img, file_path in zip(images, file_paths)
+            for path in _output_path(file_path, suffix, len(img))
+        ]
+        imgs = [i for img in images for i in img]
+        with ThreadPoolExecutor() as executor:
+            executor.map(_save_img, imgs, save_paths)
+
+        return ()
+
+
 NODE_CLASS_MAPPINGS = {
     "Load Fashion Model": LoadFashionModel,
     "Faishme Debug": FaishmeDebug,
@@ -582,4 +651,5 @@ NODE_CLASS_MAPPINGS = {
     "Faishme Repeat Image Batch": RepeatImageRowsBatch,
     "Faishme Repeat Latent Batch": RepeatLatentRowsBatch,
     "Faishme Memory Debug": MemoryDebug,
+    "Faishme Save Image": FaishmeSaveImage,
 }
