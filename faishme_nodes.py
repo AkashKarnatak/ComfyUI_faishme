@@ -699,6 +699,130 @@ class RepeatBBOX:
     def repeat(self, bbox, repeat):
         return (bbox * repeat,)
 
+class FaishmeSplit:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+
+        return {
+            "required": {
+                "value": (Any, {}),
+            }
+        }
+
+    RETURN_TYPES = (
+        Any,
+        Any,
+        Any,
+        Any,
+        Any,
+        Any,
+        Any,
+        Any,
+        Any,
+    )
+    RETURN_NAMES = (
+        "output1",
+        "output2",
+        "output3",
+        "output4",
+        "output5",
+        "output6",
+        "output7",
+        "output8",
+        "output9",
+    )
+    FUNCTION = "split"
+    CATEGORY = "FaishmeNodes"
+    OUTPUT_NODE = True
+
+    def split(self, value):
+        return value
+
+
+class FaishmeGemini:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+
+        return {
+            "required": {
+                "images": ("IMAGE",),
+                "system_prompt": ("STRING", {"multiline": True, "default": ""}),
+                "user_prompt": ("STRING", {"multiline": True, "default": ""}),
+                "api_key": ("STRING", {"default": ""}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("output",)
+    OUTPUT_NODE = True
+    FUNCTION = "run"
+    CATEGORY = "FaishmeNodes"
+
+    def run(self, images, system_prompt, user_prompt, api_key):
+        from tenacity import (
+            retry,
+            stop_after_attempt,
+            wait_exponential,
+            wait_random,
+            retry_if_exception,
+        )
+        from google.api_core.exceptions import InternalServerError, GoogleAPICallError
+        from vertexai.generative_models import FinishReason
+        from google import genai
+        from google.genai import types
+        from google.genai.types import HttpOptions
+        from typing_extensions import TypedDict
+        import json
+
+        GOOGLE_API_KEY = api_key
+        gemini_client = genai.Client(
+            api_key=GOOGLE_API_KEY, http_options=HttpOptions(timeout=120 * 1000)
+        )
+
+        class ResponseSchema1(TypedDict):
+            upperwear: str
+            lowerwear: str
+
+        @retry(
+            stop=stop_after_attempt(2),
+            wait=wait_exponential(multiplier=1, min=1, max=20) + wait_random(0, 2),
+            retry=(
+                retry_if_exception(GoogleAPICallError)
+                | retry_if_exception(InternalServerError)
+            ),
+        )
+        def call_gemini1(content, model_name, system_prompt):
+            response = gemini_client.models.generate_content(
+                model=model_name,
+                contents=content,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=0.0,
+                ),
+            )
+            return response
+
+        assert len(images.shape) == 4, "Expected 4 dims"
+        imgs = []
+        for img in images:
+            imgs.append(tensor2pil(img))
+        content = [*imgs, user_prompt]
+
+        response = call_gemini1(content, "gemini-2.5-flash", system_prompt)
+        if (
+            response.candidates[0].finish_reason == 3
+            or response.candidates[0].finish_reason == FinishReason.RECITATION
+        ):
+            return None
+        output = response.text
+        return (output,)
+
 
 NODE_CLASS_MAPPINGS = {
     "Load Fashion Model": LoadFashionModel,
@@ -706,6 +830,7 @@ NODE_CLASS_MAPPINGS = {
     "Faishme Moondream": MoondreamNode,
     "Faishme Mannequin to Model Loader": MannequinToModelLoader,
     "Faishme Load Image from Glob": LoadImagesFromGlobList,
+    "Faishme Load Mapping": FaishmeLoadMapping,
     "Faishme Stack Images": StackImages,
     "Faishme Unstack Images": UnstackImages,
     "Faishme Stack Latents": StackLatents,
@@ -716,4 +841,6 @@ NODE_CLASS_MAPPINGS = {
     "Faishme Save Image": FaishmeSaveImage,
     "Faishme Repeat Tensor Batch": RepeatTensorBatch,
     "Faishme Repeat BBOX": RepeatBBOX,
+    "Faishme Split": FaishmeSplit,
+    "Faishme Gemini": FaishmeGemini,
 }
