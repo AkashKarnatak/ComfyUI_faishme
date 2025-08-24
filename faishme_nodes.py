@@ -5,6 +5,7 @@ import psutil
 import gpustat
 from glob import glob
 import numpy as np
+import pandas as pd
 import torch
 import folder_paths as comfy_paths
 import node_helpers
@@ -27,15 +28,17 @@ def pil2tensor(image):
     return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
 
 
-def load_image_check(image_path, width, height):
+def load_image_check(image_path, width, height, default_size):
     if os.path.isdir(image_path) and os.path.ex:
         return
     i = Image.open(image_path)
     i = ImageOps.exif_transpose(i)
-    image = i.resize((width, height), Image.LANCZOS)
-    del i
+    image = i
+    if not default_size:
+        image = i.resize((width, height), Image.LANCZOS)
     image = image.convert("RGB")
     image_np = np.array(image).astype(np.float32) / 255.0
+    del i
     del image
     image_tensor = torch.from_numpy(image_np)[None,]
     del image_np  # Remove NumPy array
@@ -257,6 +260,12 @@ class LoadImagesFromGlobList:
                         "step": 1,
                     },
                 ),
+                "default_size": (
+                    "BOOLEAN",
+                    {
+                        "default": False,
+                    },
+                ),
             },
         }
 
@@ -282,8 +291,14 @@ class LoadImagesFromGlobList:
         file_path,
         width: int,
         height: int,
+        default_size: bool,
     ):
-        pattern, width, height = pattern[0], width[0], height[0]
+        pattern, width, height, default_size = (
+            pattern[0],
+            width[0],
+            height[0],
+            default_size[0],
+        )
         if file_path[0] != "":
             dir_files = file_path
         else:
@@ -312,6 +327,7 @@ class LoadImagesFromGlobList:
                         dir_files,
                         [width] * len(dir_files),
                         [height] * len(dir_files),
+                        [default_size] * len(dir_files),
                     )
                 )
             )
@@ -830,7 +846,6 @@ NODE_CLASS_MAPPINGS = {
     "Faishme Moondream": MoondreamNode,
     "Faishme Mannequin to Model Loader": MannequinToModelLoader,
     "Faishme Load Image from Glob": LoadImagesFromGlobList,
-    "Faishme Load Mapping": FaishmeLoadMapping,
     "Faishme Stack Images": StackImages,
     "Faishme Unstack Images": UnstackImages,
     "Faishme Stack Latents": StackLatents,
